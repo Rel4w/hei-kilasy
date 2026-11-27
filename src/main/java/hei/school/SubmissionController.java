@@ -161,6 +161,10 @@ public class SubmissionController {
         mailSender.send(message);
         System.out.println("Email de note envoyé à " + row.get("email"));
 
+        // notify the student by SMS (simulated: the provider is not chosen yet)
+        System.out.println("[SMS] " + row.get("phone") + " : Votre note pour « " + title
+                + " » est disponible : " + String.valueOf(grade).replace('.', ',') + "/20.");
+
         Map<String, Object> result = new HashMap<>();
         result.put("id", id);
         result.put("rawPoints", points);
