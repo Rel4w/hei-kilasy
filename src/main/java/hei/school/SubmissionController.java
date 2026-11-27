@@ -99,7 +99,10 @@ public class SubmissionController {
             double raw = ((BigDecimal) row.get("raw_points")).doubleValue();
             double max = ((BigDecimal) row.get("max_points")).doubleValue();
             result.put("rawPoints", raw);
-            result.put("grade", Math.round(raw / max * 20 * 10) / 10.0);
+            long minutesLate = java.time.Duration.between(deadline.plusDays(1).atStartOfDay(), submittedAt).toMinutes();
+            long daysLate = minutesLate <= 0 ? 0 : (minutesLate + 1439) / 1440;
+            double penalty = Math.min(daysLate * 0.10, 0.50);
+            result.put("grade", Math.round(raw / max * 20 * (1 - penalty) * 10) / 10.0);
             result.put("feedback", row.get("feedback"));
         }
         return ResponseEntity.ok(result);
@@ -130,12 +133,15 @@ public class SubmissionController {
         jdbcTemplate.update("UPDATE submission SET raw_points = ?, feedback = ?, graded_at = now() WHERE id = ?",
                 points, feedback, id);
 
-        // grade out of 20
-        double grade = Math.round(points / max * 20 * 10) / 10.0;
-
         LocalDate deadline = ((java.sql.Date) row.get("deadline")).toLocalDate();
         LocalDateTime submittedAt = ((Timestamp) row.get("submitted_at")).toLocalDateTime();
         boolean late = submittedAt.toLocalDate().isAfter(deadline);
+
+        // grade out of 20, minus 10% per started day of delay (max 50%)
+        long minutesLate = java.time.Duration.between(deadline.plusDays(1).atStartOfDay(), submittedAt).toMinutes();
+        long daysLate = minutesLate <= 0 ? 0 : (minutesLate + 1439) / 1440;
+        double penalty = Math.min(daysLate * 0.10, 0.50);
+        double grade = Math.round(points / max * 20 * (1 - penalty) * 10) / 10.0;
 
         // notify the student by email
         String fullName = (String) row.get("full_name");

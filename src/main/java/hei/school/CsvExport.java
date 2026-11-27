@@ -34,6 +34,11 @@ public class CsvExport {
             if (row.get("raw_points") != null) {
                 double n = ((BigDecimal) row.get("raw_points")).doubleValue()
                         / ((BigDecimal) row.get("max_points")).doubleValue() * 20;
+                java.time.LocalDate deadline = ((java.sql.Date) row.get("deadline")).toLocalDate();
+                java.time.LocalDateTime submittedAt = ((java.sql.Timestamp) row.get("submitted_at")).toLocalDateTime();
+                long minutesLate = java.time.Duration.between(deadline.plusDays(1).atStartOfDay(), submittedAt).toMinutes();
+                long daysLate = minutesLate <= 0 ? 0 : (minutesLate + 1439) / 1440;
+                n = n * (1 - Math.min(daysLate * 0.10, 0.50));
                 n = Math.floor(n * 10) / 10;
                 note = String.valueOf(n).replace('.', ',');
             }

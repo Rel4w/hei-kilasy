@@ -63,7 +63,11 @@ public class GradeReport {
                 } else {
                     BigDecimal raw = (BigDecimal) row.get("raw_points");
                     BigDecimal max = (BigDecimal) row.get("max_points");
-                    BigDecimal grade = raw.multiply(new BigDecimal("20")).divide(max, 1, RoundingMode.HALF_UP);
+                    long minutesLate = java.time.Duration.between(deadline.plusDays(1).atStartOfDay(), submittedAt).toMinutes();
+                    long daysLate = minutesLate <= 0 ? 0 : (minutesLate + 1439) / 1440;
+                    BigDecimal penalty = BigDecimal.valueOf(Math.min(daysLate, 5)).multiply(new BigDecimal("0.1"));
+                    BigDecimal grade = raw.multiply(new BigDecimal("20")).divide(max, 1, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.ONE.subtract(penalty)).setScale(1, RoundingMode.HALF_UP);
                     line.put("status", "CORRIGÉ");
                     line.put("grade", grade);
                     line.put("feedback", row.get("feedback"));
