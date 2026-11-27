@@ -34,9 +34,11 @@ public class CsvExport {
             if (row.get("raw_points") != null) {
                 double n = ((BigDecimal) row.get("raw_points")).doubleValue()
                         / ((BigDecimal) row.get("max_points")).doubleValue() * 20;
-                java.time.LocalDate deadline = ((java.sql.Date) row.get("deadline")).toLocalDate();
+                java.time.LocalDate deadline = row.get("deadline") == null ? null
+                        : ((java.sql.Date) row.get("deadline")).toLocalDate();
                 java.time.LocalDateTime submittedAt = ((java.sql.Timestamp) row.get("submitted_at")).toLocalDateTime();
-                long minutesLate = java.time.Duration.between(deadline.plusDays(1).atStartOfDay(), submittedAt).toMinutes();
+                long minutesLate = deadline == null ? 0
+                        : java.time.Duration.between(deadline.plusDays(1).atStartOfDay(), submittedAt).toMinutes();
                 long daysLate = minutesLate <= 0 ? 0 : (minutesLate + 1439) / 1440;
                 n = n * (1 - Math.min(daysLate * 0.10, 0.50));
                 n = Math.floor(n * 10) / 10;
@@ -47,7 +49,7 @@ public class CsvExport {
                     .append(row.get("email")).append(';')
                     .append(row.get("cohort")).append(';')
                     .append(row.get("title")).append(';')
-                    .append(row.get("deadline")).append(';')
+                    .append(row.get("deadline") == null ? "" : row.get("deadline")).append(';')
                     .append(row.get("submitted_at")).append(';')
                     .append(Boolean.TRUE.equals(row.get("late")) ? "oui" : "non").append(';')
                     .append(note).append('\n');

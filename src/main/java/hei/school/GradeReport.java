@@ -32,22 +32,26 @@ public class GradeReport {
         Map<String, Object> student = students.get(0);
 
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT e.title, e.deadline, e.max_points, s.id AS submission_id, s.submitted_at, s.raw_points, s.feedback "
+                "SELECT e.title, e.deadline, e.duration_minutes, e.max_points, s.id AS submission_id, s.submitted_at, s.raw_points, s.feedback, es.started_at "
                         + "FROM exercise e LEFT JOIN submission s ON s.exercise_id = e.id AND s.student_id = ? "
+                        + "LEFT JOIN exercise_start es ON es.exercise_id = e.id AND es.student_id = ? "
                         + "ORDER BY e.deadline",
-                studentId);
+                studentId, studentId);
 
         List<Map<String, Object>> lines = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
         int graded = 0;
         for (Map<String, Object> row : rows) {
             Map<String, Object> line = new LinkedHashMap<>();
-            LocalDate deadline = ((Date) row.get("deadline")).toLocalDate();
+            LocalDate deadline = row.get("deadline") == null ? null : ((Date) row.get("deadline")).toLocalDate();
             line.put("exercise", row.get("title"));
             line.put("deadline", deadline);
+            if (row.get("duration_minutes") != null) {
+                line.put("durationMinutes", row.get("duration_minutes"));
+            }
 
             if (row.get("submission_id") == null) {
-                if (deadline.isBefore(LocalDate.now())) {
+                if (deadline != null && deadline.isBefore(LocalDate.now())) {
                     line.put("status", "NON RENDU");
                 } else {
                     line.put("status", "À RENDRE");
@@ -56,14 +60,19 @@ public class GradeReport {
             } else {
                 LocalDateTime submittedAt = ((Timestamp) row.get("submitted_at")).toLocalDateTime();
                 line.put("submittedAt", submittedAt);
-                line.put("late", submittedAt.toLocalDate().isAfter(deadline));
+                line.put("late", deadline != null && submittedAt.toLocalDate().isAfter(deadline));
+                if (row.get("duration_minutes") != null && row.get("started_at") != null) {
+                    LocalDateTime startedAt = ((Timestamp) row.get("started_at")).toLocalDateTime();
+                    line.put("timeUsedMinutes", java.time.Duration.between(startedAt, submittedAt).toMinutes());
+                }
                 if (row.get("raw_points") == null) {
                     line.put("status", "EN ATTENTE DE CORRECTION");
                     line.put("grade", null);
                 } else {
                     BigDecimal raw = (BigDecimal) row.get("raw_points");
                     BigDecimal max = (BigDecimal) row.get("max_points");
-                    long minutesLate = java.time.Duration.between(deadline.plusDays(1).atStartOfDay(), submittedAt).toMinutes();
+                    long minutesLate = deadline == null ? 0
+                            : java.time.Duration.between(deadline.plusDays(1).atStartOfDay(), submittedAt).toMinutes();
                     long daysLate = minutesLate <= 0 ? 0 : (minutesLate + 1439) / 1440;
                     BigDecimal penalty = BigDecimal.valueOf(Math.min(daysLate, 5)).multiply(new BigDecimal("0.1"));
                     BigDecimal grade = raw.multiply(new BigDecimal("20")).divide(max, 1, RoundingMode.HALF_UP)
